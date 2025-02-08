@@ -16,7 +16,10 @@
 
 ## Installation
 
-**Note:** `scrntime` will be available in the AUR soon.
+### Through AUR
+Install the [scrntime-git AUR Package](https://aur.archlinux.org/packages/scrntime-git) using an AUR helper like `yay` or install manually:
+
+### From Source
 ```bash
 git clone https://github.com/sahaj-b/scrntime.git
 cd scrntime
@@ -24,7 +27,7 @@ cd scrntime
 python3 scrntime.py --help
 ```
 
-#### Add to path for global usage
+#### Add scrntime to path for global usage:
 ```bash
 chmod +x scrntime.py
 sudo cp scrntime.py /usr/local/bin/scrntime/scrntime
