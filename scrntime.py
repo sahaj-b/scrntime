@@ -271,9 +271,9 @@ for day in timePerDayDict:
 
 # printing total time
 print(
-    colored("Total (", COLOR_DATES)
+    colored("Total (", "cyan")
     + colored(len(timePerDayDict), COLOR_TIMES)
-    + colored(" days): ", COLOR_DATES)
+    + colored(" days): ", "cyan")
     + bold(
         colored(
             f"{str(sumTime.days)+'d ' if sumTime.days else ''}{sumTime.seconds // 3600}h {sumTime.seconds // 60 % 60}m",
@@ -284,5 +284,17 @@ print(
         colored(" (including idle times): ", COLOR_DATES)
         if args.with_idletimes
         else colored(": ", COLOR_DATES)
+    )
+)
+
+# printing average time
+avgTime = sumTime / len(timePerDayDict)
+print(
+    colored("Average: ", "cyan")
+    + bold(
+        colored(
+            f"{str(avgTime.days)+'d ' if avgTime.days else ''}{avgTime.seconds // 3600}h {avgTime.seconds // 60 % 60}m",
+            "yellow",
+        )
     )
 )
