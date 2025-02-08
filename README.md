@@ -19,7 +19,7 @@
 git clone https://github.com/sahaj-b/scrntime.git
 cd scrntime
 # Usage:
-pytyhon3 scrntime.py --help
+python3 scrntime.py --help
 ```
 
 #### Add to path for global usage
