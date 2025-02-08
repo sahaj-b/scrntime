@@ -33,7 +33,8 @@ scrntime --help
 ## Setup Idle Time Management
 `scrntime` doesn't have a built-in idle time tracker. However, you can use the following tools with `scrntime` to track idle time by storing idle times in a file (default: `~/.idletimes`):
   - ### Xorg - `xprintidle`
-    coming soon
+    - Install [xprintidle](https://github.com/g0hl1n/xprintidle) using your package manager 
+    - Run and Autostart `xprintidle_scrntime.sh`(script in this repo) on startup 
 
   - ### Hyprland - `hypridle`
     - Install [hypridle](https://wiki.hyprland.org/Hypr-Ecosystem/hypridle/)
@@ -57,3 +58,8 @@ scrntime --help
             resume 'scrntime -a $(( $(date +%s) - $(cat /tmp/idle) ))'
     ```
     - Add this command to your sway config for autostart
+
+## Note:
+This only shows the uptime of the system subtracted by the idle/afk time(which may not be fully accurate), and it doesn't have the capability to track the time spent on a particular application/window.
+
+For that purpose, you can use tools like [ActivityWatch](https://activitywatch.net/) (with [aw-watcher-window-wayland](https://github.com/ActivityWatch/aw-watcher-window-wayland) if on wayland), but I couldn't find a good cli for displaying the data on the terminal, guis are available though.
