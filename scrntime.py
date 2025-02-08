@@ -281,7 +281,7 @@ print(
         )
     )
     + (
-        colored(" (ignoring idle times): ", COLOR_DATES)
+        colored(" (including idle times): ", COLOR_DATES)
         if args.with_idletimes
         else colored(": ", COLOR_DATES)
     )
