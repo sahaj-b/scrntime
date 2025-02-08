@@ -15,6 +15,8 @@
 - `python` Ensure that Python 3 is installed on your system.
 
 ## Installation
+
+**Note:** `scrntime` will be available in the AUR soon.
 ```bash
 git clone https://github.com/sahaj-b/scrntime.git
 cd scrntime
