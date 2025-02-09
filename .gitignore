@@ -1,4 +1,5 @@
-scrntime
+scrntime.egg*
 scrntime-git-*
 pkg
 src
+dist

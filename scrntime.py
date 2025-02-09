@@ -7,29 +7,52 @@ import argparse
 # defaults
 IDLETIME_FILE = os.path.expanduser("~") + "/.idletimes"
 MAX_BAR_LENGTH = 40
+DAYS_TO_SHOW = 7
 BAR_CHARACTER = "❙"  # 🬋❙
 COLOR_DATES = "green"
 COLOR_TIMES = "blue"
 COLOR_BARS = "blue"
 COLOR_IDLE_BARS = "lightgray"
+DATE_FORMAT = "%b %d"
+TIME_FORMAT = "%H:%M"
+SECONDS_PER_BAR = "auto"
+WITH_IDLETIMES = False
+CURRENT_TIME = datetime.now()
 
 
-def printTime(day, netTime, idletime_seconds):
-    formattedTime_split = str(netTime).split(":")
-    formattedTimeStr = f"{f'{formattedTime_split[0]}': >2}h {formattedTime_split[1]}m"
-    netTimeWithoutIdle = netTime - timedelta(seconds=idletime_seconds)
+def printTime(dayStr, durationWithIdletime, idletimeSeconds):
+    netDuration = durationWithIdletime - timedelta(seconds=idletimeSeconds)
+    if WITH_IDLETIMES:
+        if durationWithIdletime.days == 1:
+            formattedTimeStr = "24h 00m"
+        else:
+            formattedTimeStr = f"{f'{durationWithIdletime.total_seconds() // 3600:.0f}': >2}h {f'{durationWithIdletime.total_seconds() //60 % 60:.0f}': >2}m"
+    else:
+        if netDuration.days == 1:
+            formattedTimeStr = "24h 00m"
+        else:
+            formattedTimeStr = f"{f'{netDuration.total_seconds() // 3600:.0f}': >2}h {f'{netDuration.total_seconds() //60 % 60:.0f}': >2}m"
+
     print(
-        colored(day, COLOR_DATES)
+        colored(dayStr, COLOR_DATES)
         + " "
         + bold(colored(formattedTimeStr, COLOR_TIMES))
         + " "
-        + colored(
-            BAR_CHARACTER * int(netTimeWithoutIdle.total_seconds() // SECONDS_PER_BAR),
-            COLOR_BARS,
+        + (
+            colored(
+                BAR_CHARACTER * int(netDuration.total_seconds() // SECONDS_PER_BAR),
+                COLOR_BARS,
+            )
+            if SECONDS_PER_BAR
+            else ""
         )
-        + colored(
-            BAR_CHARACTER * int(idletime_seconds // SECONDS_PER_BAR),
-            COLOR_IDLE_BARS,
+        + (
+            colored(
+                BAR_CHARACTER * int(idletimeSeconds // SECONDS_PER_BAR),
+                COLOR_IDLE_BARS,
+            )
+            if SECONDS_PER_BAR and WITH_IDLETIMES
+            else ""
         )
     )
 
@@ -64,7 +87,6 @@ def updateIdleTime(file, latestIdleDateTime, currentIdleTime):
     )
     newIdleTime_split = str(latestIdleTime_obj + currentIdleTime).split(":")
     newIdleTimeStr = newIdleTime_split[0].zfill(2) + ":" + newIdleTime_split[1]
-    print(f"Updated idletime from {latestIdleDateTime[1][:-1]} to {newIdleTimeStr}")
 
     file.seek(0)
     file.write(latestIdleDateTime[0] + " - " + newIdleTimeStr + "\n")
@@ -98,6 +120,7 @@ def addIdleTimeToFile(seconds):
 
 
 def parseArgs():
+    global IDLETIME_FILE, MAX_BAR_LENGTH, BAR_CHARACTER, DAYS_TO_SHOW, WITH_IDLETIMES
     parser = argparse.ArgumentParser(description="Show screen time for the last n days")
     parser.add_argument(
         "-d",
@@ -105,7 +128,7 @@ def parseArgs():
         type=int,
         nargs="?",
         help="Number of days to show screen time for (default: %(default)d)",
-        default=7,
+        default=DAYS_TO_SHOW,
     )
     parser.add_argument(
         "-i",
@@ -145,156 +168,248 @@ def parseArgs():
         metavar="SECONDS",
     )
     args = parser.parse_args()
-    return args
+
+    if args.add_idletime:
+        addIdleTimeToFile(args.add_idletime)
+        sys.exit(0)
+
+    IDLETIME_FILE = args.idletime_file.name
+    MAX_BAR_LENGTH = args.max_length
+    DAYS_TO_SHOW = args.days
+    WITH_IDLETIMES = args.with_idletimes
+
+    match args.style:
+        case 1:
+            BAR_CHARACTER = "❙"
+        case 2:
+            BAR_CHARACTER = "🬋"
+        case 3:
+            BAR_CHARACTER = "▆"
+        case 4:
+            BAR_CHARACTER = "❘"
+        case 5:
+            BAR_CHARACTER = "❚"
+        case 6:
+            BAR_CHARACTER = "█"
+        case 7:
+            BAR_CHARACTER = "━"
+        case 8:
+            BAR_CHARACTER = "▭"
+        case 9:
+            BAR_CHARACTER = "╼"
 
 
-args = parseArgs()
-if args.add_idletime:
-    addIdleTimeToFile(args.add_idletime)
-    sys.exit(0)
+def updateTimePerDayDict(timePerDayDict, rebootDateObj, rebootDuration):
+    rebootDurationWithoutDays = timedelta(
+        hours=rebootDuration.seconds // 3600, minutes=rebootDuration.seconds // 60 % 60
+    )
+    if rebootDuration.days > 0:
+        for i in range(1, rebootDuration.days + 1):
+            timePerDayDict[(rebootDateObj + timedelta(days=i))] = timedelta(days=1)
+    try:
+        timePerDayDict[rebootDateObj] += rebootDurationWithoutDays
+    except KeyError:
+        timePerDayDict[rebootDateObj] = rebootDurationWithoutDays
 
-IDLETIME_FILE = args.idletime_file.name
-MAX_BAR_LENGTH = args.max_length
 
-match args.style:
-    case 1:
-        BAR_CHARACTER = "❙"
-    case 2:
-        BAR_CHARACTER = "🬋"
-    case 3:
-        BAR_CHARACTER = "▆"
-    case 4:
-        BAR_CHARACTER = "❘"
-    case 5:
-        BAR_CHARACTER = "❚"
-    case 6:
-        BAR_CHARACTER = "█"
-    case 7:
-        BAR_CHARACTER = "━"
-    case 8:
-        BAR_CHARACTER = "▭"
-    case 9:
-        BAR_CHARACTER = "╼"
-
-daysToShow = args.days
-
-# reading reboot times
-rebootOutput = os.popen("last reboot")
-rebootLine = rebootOutput.readline()[:-1]
-timePerDayDict = {}
-dateFormat = "%b %d"
-timeFormat = "%H:%M"
-
-current_year = datetime.now().year
-while rebootLine:
-    reboot = rebootLine.split()
-    reboot_date = " ".join(reboot[5:7])
-    reboot_date = reboot_date[:4] + reboot_date[4:].zfill(2)
-    if reboot_date not in timePerDayDict and len(timePerDayDict) == daysToShow:
-        break
-    if len(reboot) < 3:
-        break
-    if reboot[-1] == "running":
-        reboot_time = datetime.strptime(
-            f"{reboot[-3]} {reboot_date} {current_year}", "%H:%M %b %d %Y"
-        )
-        current_time = datetime.strptime(
-            f"{datetime.strftime(datetime.now(), timeFormat)} {datetime.strftime(datetime.now(), dateFormat)} {current_year}",
-            "%H:%M %b %d %Y",
-        )
-        timePerDayDict[reboot_date] = current_time - reboot_time
-    else:
-        reboot_duration = datetime.strptime(reboot[-1][1:-1], timeFormat)
-        try:
-            timePerDayDict[reboot_date] += timedelta(
-                hours=reboot_duration.hour, minutes=reboot_duration.minute
+def fillMissingDaysWithZeroTime(timePerDayDict, rebootDateObj):
+    if rebootDateObj not in timePerDayDict:
+        latestZeroTimeDay = rebootDateObj + timedelta(days=1)
+        oldestZeroTimeDay = latestZeroTimeDay
+        while (
+            oldestZeroTimeDay not in timePerDayDict
+            and oldestZeroTimeDay <= CURRENT_TIME.date()
+        ):
+            oldestZeroTimeDay += timedelta(days=1)
+        for i in range(1, (oldestZeroTimeDay - latestZeroTimeDay).days + 1):
+            if len(timePerDayDict) == DAYS_TO_SHOW:
+                return
+            updateTimePerDayDict(
+                timePerDayDict, oldestZeroTimeDay - timedelta(days=i), timedelta(0)
             )
-        except KeyError:
-            timePerDayDict[reboot_date] = timedelta(
-                hours=reboot_duration.hour, minutes=reboot_duration.minute
-            )
+
+
+def handleRunningRebootLine(latestRunningRebootLine, timePerDayDict):
+    runningRebootDateStr = " ".join(latestRunningRebootLine[5:7])
+    runningRebootDateStr = runningRebootDateStr[:4] + runningRebootDateStr[4:].zfill(2)
+    runningRebootDateObj = datetime.strptime(
+        runningRebootDateStr + str(CURRENT_TIME.year), "%b %d%Y"
+    ).date()
+    rebootTime = datetime.strptime(
+        f"{latestRunningRebootLine[-3]} {runningRebootDateStr} {CURRENT_TIME.year}",
+        "%H:%M %b %d %Y",
+    )
+    updateTimePerDayDict(
+        timePerDayDict, runningRebootDateObj, CURRENT_TIME - rebootTime
+    )
+
+
+def parseRebootLogs():
+    rebootOutput = os.popen("last reboot")
     rebootLine = rebootOutput.readline()[:-1]
+    timePerDayDict = {}
+    latestRunningRebootLine = None
 
-# handling idle times
-try:
-    with open(IDLETIME_FILE, "r") as file:
+    while rebootLine:
+        rebootLine = rebootLine.split()
+        rebootDateStr = " ".join(rebootLine[5:7])
+        rebootDateStr = rebootDateStr[:4] + rebootDateStr[4:].zfill(2)
+        rebootDateObj = datetime.strptime(
+            rebootDateStr + str(CURRENT_TIME.year), "%b %d%Y"
+        ).date()
+
+        if rebootDateObj not in timePerDayDict and len(timePerDayDict) > DAYS_TO_SHOW:
+            return timePerDayDict
+
+        fillMissingDaysWithZeroTime(timePerDayDict, rebootDateObj)
+
+        if len(rebootLine) < 3:
+            break
+        if rebootLine[-1] == "running":
+            latestRunningRebootLine = rebootLine
+            rebootLine = rebootOutput.readline()
+            continue
+
+        if latestRunningRebootLine:
+            handleRunningRebootLine(latestRunningRebootLine, timePerDayDict)
+            latestRunningRebootLine = None
+        try:
+            rebootTimeObj = datetime.strptime(rebootLine[-1], "(%H:%M)")
+            rebootDuration = timedelta(
+                hours=rebootTimeObj.hour,
+                minutes=rebootTimeObj.minute,
+            )
+        except ValueError:
+            rebootTimeObj = datetime.strptime(
+                f"{rebootLine[-1][1:-1].zfill(8)} {CURRENT_TIME.year}",
+                "%d+%H:%M %Y",
+            )
+            rebootDuration = timedelta(
+                days=rebootTimeObj.day,
+                hours=rebootTimeObj.hour,
+                minutes=rebootTimeObj.minute,
+            )
+
+        updateTimePerDayDict(timePerDayDict, rebootDateObj, rebootDuration)
+        rebootLine = rebootOutput.readline()[:-1]
+
+    return timePerDayDict
+
+
+def parseIdleTimes(timePerDayDict):
+    try:
+        with open(IDLETIME_FILE, "r") as file:
+            idletimesDict = {}
+            idletimes = file.read().split("\n")
+            for idletime in idletimes:
+                if idletime:
+                    idletime = idletime.split(" - ")
+                    idleDateStr = idletime[0].strip()
+                    idleDateObj = datetime.strptime(
+                        idleDateStr + str(CURRENT_TIME.year), DATE_FORMAT + "%Y"
+                    ).date()
+                    if (
+                        idleDateObj not in timePerDayDict
+                        and len(timePerDayDict) == DAYS_TO_SHOW
+                    ):
+                        break
+                    idletimeObj = datetime.strptime(idletime[1], TIME_FORMAT)
+                    idletimeObj = timedelta(
+                        hours=idletimeObj.hour, minutes=idletimeObj.minute
+                    )
+                    idletimesDict[idleDateObj] = idletimeObj
+    except FileNotFoundError:
+        print(colored(bold("No idletime file found"), "red"))
         idletimesDict = {}
-        idletimes = file.read().split("\n")
-        for idletime in idletimes:
-            if idletime:
-                idletime = idletime.split(" - ")
-                idleDateStr = idletime[0].strip()
-                if (
-                    idleDateStr not in timePerDayDict
-                    and len(timePerDayDict) == daysToShow
-                ):
-                    break
-                idletimeObj = datetime.strptime(idletime[1], timeFormat)
-                idletimeObj = timedelta(
-                    hours=idletimeObj.hour, minutes=idletimeObj.minute
-                )
-                idletimesDict[idletime[0].strip()] = idletimeObj
-except FileNotFoundError:
-    print(colored(bold("No idletime file found"), "red"))
-    idletimesDict = {}
+    return idletimesDict
 
-# adjusting SECONDS_PER_BAR based on maxTime and MAX_BAR_LENGTH
-maxTime = max(
-    map(
-        lambda day: timePerDayDict[day]
-        - (
-            timedelta(0)
-            if args.with_idletimes
-            else idletimesDict.get(day, timedelta(0))
-        ),
-        timePerDayDict,
-    )
-)
-SECONDS_PER_BAR = maxTime.total_seconds() / MAX_BAR_LENGTH
 
-# printing times
-sumTime = timedelta(0)
-for day in timePerDayDict:
-    netTime = timePerDayDict[day] - (
-        timedelta(0) if args.with_idletimes else idletimesDict.get(day, timedelta(0))
-    )
-    sumTime += netTime
-    printTime(
-        day,
-        netTime,
-        (
-            idletimesDict.get(day, timedelta(0)).total_seconds()
-            if args.with_idletimes
-            else 0
-        ),
-    )
+def getSecondsPerBar(timePerDayDict, idletimesDict):
+    maxTime = timedelta(0)
+    count = 0
+    for day in timePerDayDict:
+        count += 1
+        if count > DAYS_TO_SHOW:
+            break
+        netDuration = timePerDayDict[day] - (
+            timedelta(0) if WITH_IDLETIMES else (idletimesDict.get(day, timedelta(0)))
+        )
+        if netDuration > maxTime:
+            maxTime = netDuration
+    return maxTime.total_seconds() / MAX_BAR_LENGTH
 
-# printing total time
-print(
-    colored("Total (", "cyan")
-    + colored(len(timePerDayDict), COLOR_TIMES)
-    + colored(" days): ", "cyan")
-    + bold(
-        colored(
-            f"{str(sumTime.days)+'d ' if sumTime.days else ''}{sumTime.seconds // 3600}h {sumTime.seconds // 60 % 60}m",
-            "yellow",
+
+def printAllDays(timePerDayDict, idletimesDict):
+    count = 0
+    for day in timePerDayDict:
+        count += 1
+        if count > DAYS_TO_SHOW:
+            break
+        printTime(
+            day.strftime(DATE_FORMAT),
+            timePerDayDict[day],
+            idletimesDict.get(day, timedelta(0)).total_seconds(),
+        )
+
+
+def getTotalTime(timePerDayDict, idletimesDict):
+    totalTime = timedelta(0)
+    count = 0
+    for day in timePerDayDict:
+        count += 1
+        if count > DAYS_TO_SHOW:
+            break
+        totalTime += timePerDayDict[day] - (
+            timedelta(0) if WITH_IDLETIMES else idletimesDict.get(day, timedelta(0))
+        )
+    return totalTime
+
+
+def printTotalTime(totalTime):
+    print(
+        colored("Total (", "cyan")
+        + colored(DAYS_TO_SHOW, COLOR_TIMES)
+        + colored(" days): ", "cyan")
+        + bold(
+            colored(
+                f"{str(totalTime.days)+'d ' if totalTime.days else ''}{totalTime.seconds // 3600}h {totalTime.seconds // 60 % 60}m",
+                "yellow",
+            )
+        )
+        + (
+            colored(" (including idle times): ", COLOR_DATES)
+            if WITH_IDLETIMES
+            else colored(": ", COLOR_DATES)
         )
     )
-    + (
-        colored(" (including idle times): ", COLOR_DATES)
-        if args.with_idletimes
-        else colored(": ", COLOR_DATES)
-    )
-)
 
-# printing average time
-avgTime = sumTime / len(timePerDayDict)
-print(
-    colored("Average: ", "cyan")
-    + bold(
-        colored(
-            f"{str(avgTime.days)+'d ' if avgTime.days else ''}{avgTime.seconds // 3600}h {avgTime.seconds // 60 % 60}m",
-            "yellow",
+
+def printAverageTime(timePerDayDict, totalTime):
+    avgTime = totalTime / len(timePerDayDict)
+    print(
+        colored("Average: ", "cyan")
+        + bold(
+            colored(
+                f"{str(avgTime.days)+'d ' if avgTime.days else ''}{avgTime.seconds // 3600}h {avgTime.seconds // 60 % 60}m",
+                "yellow",
+            )
         )
     )
-)
+
+
+def main():
+    global SECONDS_PER_BAR
+
+    parseArgs()
+    timePerDayDict = parseRebootLogs()
+    idletimesDict = parseIdleTimes(timePerDayDict)
+    if SECONDS_PER_BAR == "auto":
+        SECONDS_PER_BAR = getSecondsPerBar(timePerDayDict, idletimesDict)
+    printAllDays(timePerDayDict, idletimesDict)
+    totalTime = getTotalTime(timePerDayDict, idletimesDict)
+    printTotalTime(totalTime)
+    printAverageTime(timePerDayDict, totalTime)
+
+
+if __name__ == "__main__":
+    main()
