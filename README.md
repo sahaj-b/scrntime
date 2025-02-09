@@ -16,7 +16,12 @@
 
 ## Installation
 
-### Will be available in PyPi soon
+### PyPi
+```bash
+pip install scrntime
+#OR
+pipx install scrntime
+```
 
 ### Through AUR
 Install the [scrntime-git AUR Package](https://aur.archlinux.org/packages/scrntime-git) using an AUR helper like `yay` or install manually:
