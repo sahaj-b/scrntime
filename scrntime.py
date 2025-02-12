@@ -131,7 +131,7 @@ def createIdleTime(file, idleTime, idleDate):
     idleDatesTimes = file.readlines()
 
     if idleTime.days == 1:
-        newIdleTimeStr = "24:00"
+        newIdleTimeStr = "23:59"
     else:
         newIdleTime_split = str(idleTime).split(":")
         newIdleTimeStr = newIdleTime_split[0].zfill(2) + ":" + newIdleTime_split[1]
