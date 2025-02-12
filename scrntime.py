@@ -80,43 +80,121 @@ def colored(text, color):
         return text
 
 
-def updateIdleTime(file, latestIdleDateTime, currentIdleTime):
-    latestIdleTime_obj = timedelta(
-        hours=int(latestIdleDateTime[1].split(":")[0]),
-        minutes=int(latestIdleDateTime[1].split(":")[1]),
+def updateIdleTime(file, idleTime, idleDate):
+    idleTimesList = []
+    file.seek(0)
+    idleTimeToUpdate_str = file.readline()
+    idleTimesList.append(idleTimeToUpdate_str)
+    idleTimeToUpdate_split = idleTimeToUpdate_str.split(" - ")
+    idleDateToUpdate_obj = datetime.strptime(
+        idleTimeToUpdate_split[0] + CURRENT_TIME.strftime("%Y"), DATE_FORMAT + "%Y"
+    ).date()
+    while idleDateToUpdate_obj > idleDate:
+        idleTimeToUpdate_str = file.readline()
+        if not idleTimeToUpdate_str:
+            idleDateToUpdate_obj = None
+            break
+        idleTimesList.append(idleTimeToUpdate_str)
+        idleTimeToUpdate_split = idleTimeToUpdate_str.split(" - ")
+        idleDateToUpdate_obj = datetime.strptime(
+            idleTimeToUpdate_split[0] + CURRENT_TIME.strftime("%Y"), DATE_FORMAT + "%Y"
+        ).date()
+
+    if idleDateToUpdate_obj != idleDate:
+        createIdleTime(file, idleTime, idleDate)
+
+    idleTimeToUpdate_obj = timedelta(
+        hours=int(idleTimeToUpdate_split[1].split(":")[0]),
+        minutes=int(idleTimeToUpdate_split[1].split(":")[1]),
     )
-    newIdleTime_split = str(latestIdleTime_obj + currentIdleTime).split(":")
+
+    newIdleTime_obj = idleTimeToUpdate_obj + idleTime
+    if newIdleTime_obj.days > 0:
+        print("Invalid/Impossible idletime, skipping update")
+        sys.exit(1)
+
+    newIdleTime_split = str(newIdleTime_obj).split(":")
     newIdleTimeStr = newIdleTime_split[0].zfill(2) + ":" + newIdleTime_split[1]
+    print(
+        "Updating idletime for",
+        idleDate.strftime(DATE_FORMAT),
+        "to " + newIdleTimeStr,
+    )
 
     file.seek(0)
-    file.write(latestIdleDateTime[0] + " - " + newIdleTimeStr + "\n")
+    idleTimesList[-1] = idleDate.strftime(DATE_FORMAT) + " - " + newIdleTimeStr + "\n"
+    file.writelines(idleTimesList)
 
 
-def createIdleTime(file, currentIdleTime):
+def createIdleTime(file, idleTime, idleDate):
     file.seek(0)
     idleDatesTimes = file.readlines()
-    newIdleTime_split = str(currentIdleTime).split(":")
-    newIdleTimeStr = newIdleTime_split[0].zfill(2) + ":" + newIdleTime_split[1]
-    newIdleDateTimeStr = f"{datetime.now().strftime('%b %d')} - {newIdleTimeStr}"
-    idleDatesTimes.insert(0, newIdleDateTimeStr + "\n")
-    print("Creating new idletime: " + newIdleTimeStr)
+
+    if idleTime.days == 1:
+        newIdleTimeStr = "24:00"
+    else:
+        newIdleTime_split = str(idleTime).split(":")
+        newIdleTimeStr = newIdleTime_split[0].zfill(2) + ":" + newIdleTime_split[1]
+
+    newIdleDateTimeStr = f"{idleDate.strftime(DATE_FORMAT)} - {newIdleTimeStr}"
+
+    insertionIndex = -1
+    for i, idleDateTime in enumerate(idleDatesTimes):
+        if idleDateTime:
+            idleDate_obj = datetime.strptime(
+                idleDateTime.split(" - ")[0] + CURRENT_TIME.strftime("%Y"),
+                DATE_FORMAT + "%Y",
+            ).date()
+            if idleDate_obj < idleDate:
+                insertionIndex = i
+                break
+    idleDatesTimes.insert(insertionIndex, newIdleDateTimeStr + "\n")
+    print(
+        "Creating new idletime for ",
+        idleDate.strftime(DATE_FORMAT),
+        ": " + newIdleTimeStr,
+    )
+
     file.seek(0)
     file.writelines(idleDatesTimes)
 
 
-def addIdleTimeToFile(seconds):
-    currentIdleTime = timedelta(seconds=seconds)
+def addIdleTimeToFile(idleTime_seconds, idleDate=CURRENT_TIME.date()):
+    idleTime = timedelta(seconds=idleTime_seconds)
+    if idleDate == CURRENT_TIME.date():
+        elapsedTimeForIdleDate = timedelta(
+            hours=CURRENT_TIME.hour, minutes=CURRENT_TIME.minute
+        )
+    else:
+        elapsedTimeForIdleDate = timedelta(hours=24)
+
+    idleTimeForPreviousDay = idleTime - elapsedTimeForIdleDate
+
+    # print("For ", idleDate.strftime(DATE_FORMAT))
+    # print("Idle time:", idleTime)
+    # print("Elapsed time:", elapsedTimeForIdleDate)
+    # print("Idle time for previous day:", idleTimeForPreviousDay)
+
+    if idleTimeForPreviousDay > timedelta(0):
+        print("Idletime for previous day detected, splitting...")
+        addIdleTimeToFile(
+            idleTimeForPreviousDay.total_seconds(), idleDate - timedelta(days=1)
+        )
+        idleTime = elapsedTimeForIdleDate
     with open(IDLETIME_FILE, "r+") as file:
         latestIdleStr = file.readline()
         if latestIdleStr:
-            latestIdleDateTime = latestIdleStr.split(" - ")
+            latestIdleDate_obj = datetime.strptime(
+                latestIdleStr.split(" - ")[0] + CURRENT_TIME.strftime("%Y"),
+                DATE_FORMAT + "%Y",
+            ).date()
         else:
-            latestIdleDateTime = [-1, -1]
-
-        if latestIdleDateTime[0] == datetime.now().strftime("%b %d"):
-            updateIdleTime(file, latestIdleDateTime, currentIdleTime)
+            createIdleTime(file, idleTime, idleDate)
+            return
+        if latestIdleDate_obj >= idleDate:
+            updateIdleTime(file, idleTime, idleDate)
         else:
-            createIdleTime(file, currentIdleTime)
+            createIdleTime(file, idleTime, idleDate)
 
 
 def parseArgs():

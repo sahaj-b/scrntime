@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name="scrntime",
-    version="1.0.0",
+    version="1.1.0",
     py_modules=["scrntime"],
     entry_points={
         "console_scripts": [
@@ -18,6 +18,6 @@ setup(
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: BSD License",
-        "Operating System :: Linux",
+        "Operating System :: POSIX :: Linux",
     ],
 )
