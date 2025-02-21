@@ -430,23 +430,23 @@ def printAllDays(timePerDayDict, idletimesDict):
         )
 
 
-def getTotalTime(timePerDayDict, idletimesDict):
+def getTotalTimeAndDays(timePerDayDict, idletimesDict):
     totalTime = timedelta(0)
-    count = 0
+    numOfDays = 0
     for day in timePerDayDict:
-        count += 1
-        if count > DAYS_TO_SHOW:
+        numOfDays += 1
+        if numOfDays > DAYS_TO_SHOW:
             break
         totalTime += timePerDayDict[day] - (
             timedelta(0) if WITH_IDLETIMES else idletimesDict.get(day, timedelta(0))
         )
-    return totalTime
+    return totalTime, numOfDays - 1
 
 
-def printTotalTime(totalTime):
+def printTotalTime(totalTime, numOfDays):
     print(
         colored("Total (", "cyan")
-        + colored(DAYS_TO_SHOW, COLOR_TIMES)
+        + colored(numOfDays, COLOR_TIMES)
         + colored(" days): ", "cyan")
         + bold(
             colored(
@@ -484,8 +484,8 @@ def main():
     if SECONDS_PER_BAR == "auto":
         SECONDS_PER_BAR = getSecondsPerBar(timePerDayDict, idletimesDict)
     printAllDays(timePerDayDict, idletimesDict)
-    totalTime = getTotalTime(timePerDayDict, idletimesDict)
-    printTotalTime(totalTime)
+    totalTime, numOfDays = getTotalTimeAndDays(timePerDayDict, idletimesDict)
+    printTotalTime(totalTime, numOfDays)
     printAverageTime(timePerDayDict, totalTime)
 
 
