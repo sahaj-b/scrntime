@@ -54,7 +54,7 @@ scrntime --help
     ```conf
     # for sleep/suspend support
     general {
-        before_sleep_cmd = echo $(date +%s) > /tmp/idle && swaylock -c 000000 -F
+        before_sleep_cmd = echo $(date +%s) > /tmp/idle
         after_sleep_cmd = scrntime -a $(( $(date +%s) - $(cat /tmp/idle) ))
     }
     listener {
