@@ -52,6 +52,11 @@ scrntime --help
     - Install [hypridle](https://wiki.hyprland.org/Hypr-Ecosystem/hypridle/)
     - Add this snippet to `~/.config/hypr/hypridle.conf`:
     ```conf
+    # for sleep/suspend support
+    general {
+        before_sleep_cmd = echo $(date +%s) > /tmp/idle && swaylock -c 000000 -F
+        after_sleep_cmd = scrntime -a $(( $(date +%s) - $(cat /tmp/idle) ))
+    }
     listener {
         timeout = 150 # 2.5 minutes
         on-timeout = echo $(( $(date +%s) - 150 )) > /tmp/idle
