@@ -37,7 +37,7 @@ python3 scrntime.py --help
 #### Add scrntime to path for global usage:
 ```bash
 chmod +x scrntime.py
-sudo cp scrntime.py /usr/local/bin/scrntime/scrntime
+sudo cp scrntime.py /usr/local/bin/scrntime
 # Usage:
 scrntime --help
 
