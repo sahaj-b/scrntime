@@ -40,6 +40,27 @@ chmod +x scrntime.py
 sudo cp scrntime.py /usr/local/bin/scrntime/scrntime
 # Usage:
 scrntime --help
+
+```
+
+## Usage
+```
+usage: scrntime [-h] [-d [DAYS]] [-i] [-s NUMBER(1-9)] [-m LENGTH] [-f FILE] [-a SECONDS]
+
+Show screen time for the last n days
+
+options:
+  -h, --help            show this help message and exit
+  -d, --days [DAYS]     Number of days to show screen time for (default: 7)
+  -i, --with-idletimes  Also show idle times
+  -s, --style NUMBER(1-9)
+                        Style for bar character (1-9) (default: 1)
+  -m, --max-length LENGTH
+                        Specify length of longest bar to auto adjust other bars relatively (default: 40)
+  -f, --idletime-file FILE
+                        Specify the file to read/write idletimes (default: ~/.idletimes)
+  -a, --add-idletime SECONDS
+                        Add idle time for today (in seconds)
 ```
 
 ## Setup Idle Time Management
