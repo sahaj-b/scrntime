@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name="scrntime",
-    version="1.4.0",
+    version="1.4.1",
     py_modules=["scrntime"],
     entry_points={
         "console_scripts": [
