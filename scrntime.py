@@ -351,22 +351,29 @@ def parseRebootLogs():
         if latestRunningRebootLine:
             handleRunningRebootLine(latestRunningRebootLine, timePerDayDict)
             latestRunningRebootLine = None
+
         try:
+            # (HH:MM)
             rebootTimeObj = datetime.strptime(rebootLine[-1], "(%H:%M)")
             rebootDuration = timedelta(
                 hours=rebootTimeObj.hour,
                 minutes=rebootTimeObj.minute,
             )
         except ValueError:
-            rebootTimeObj = datetime.strptime(
-                f"{rebootLine[-1][1:-1].zfill(8)} {CURRENT_TIME.year}",
-                "%d+%H:%M %Y",
-            )
-            rebootDuration = timedelta(
-                days=rebootTimeObj.day,
-                hours=rebootTimeObj.hour,
-                minutes=rebootTimeObj.minute,
-            )
+            try:
+                # (DD+HH:MM)
+                rebootTimeObj = datetime.strptime(
+                    f"{rebootLine[-1][1:-1].zfill(8)} {CURRENT_TIME.year}",
+                    "%d+%H:%M %Y",
+                )
+                rebootDuration = timedelta(
+                    days=rebootTimeObj.day,
+                    hours=rebootTimeObj.hour,
+                    minutes=rebootTimeObj.minute,
+                )
+            except ValueError:
+                # weird durations like (-HH:MM)
+                rebootDuration = timedelta(0)
 
         updateTimePerDayDict(timePerDayDict, rebootDateObj, rebootDuration)
         rebootLine = rebootOutput.readline()[:-1]
