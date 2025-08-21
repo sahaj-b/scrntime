@@ -8,7 +8,7 @@ import argparse
 IDLETIME_FILE = os.path.expanduser("~") + "/.idletimes"
 MAX_BAR_LENGTH = 40
 DAYS_TO_SHOW = 7
-BAR_CHARACTER = "❙"  # 🬋❙
+BAR_CHARACTER = "🬋"  # 🬋❙
 COLOR_DATES = "green"
 COLOR_TIMES = "blue"
 COLOR_BARS = "blue"
@@ -258,9 +258,9 @@ def parseArgs():
 
     match args.style:
         case 1:
-            BAR_CHARACTER = "❙"
-        case 2:
             BAR_CHARACTER = "🬋"
+        case 2:
+            BAR_CHARACTER = "❙"
         case 3:
             BAR_CHARACTER = "▆"
         case 4:
