@@ -277,17 +277,22 @@ def parseArgs():
             BAR_CHARACTER = "╼"
 
 
-def updateTimePerDayDict(timePerDayDict, rebootDateObj, rebootDuration):
-    rebootDurationWithoutDays = timedelta(
-        hours=rebootDuration.seconds // 3600, minutes=rebootDuration.seconds // 60 % 60
-    )
-    if rebootDuration.days > 0:
-        for i in range(1, rebootDuration.days + 1):
-            timePerDayDict[(rebootDateObj + timedelta(days=i))] = timedelta(days=1)
-    try:
-        timePerDayDict[rebootDateObj] += rebootDurationWithoutDays
-    except KeyError:
-        timePerDayDict[rebootDateObj] = rebootDurationWithoutDays
+def updateTimePerDayDict(timePerDayDict, bootDatetime, endDatetime):
+    """
+    Attribute the wall-clock time the machine was on, from bootDatetime to
+    endDatetime, to each calendar day it spans, splitting at midnight instead of
+    lumping whole spare days onto a single date.
+    """
+    if endDatetime <= bootDatetime:
+        return
+    cursor = bootDatetime
+    day = cursor.date()
+    while day < endDatetime.date():
+        nextMidnight = datetime.combine(day + timedelta(days=1), datetime.min.time())
+        timePerDayDict[day] = timePerDayDict.get(day, timedelta(0)) + (nextMidnight - cursor)
+        cursor = nextMidnight
+        day += timedelta(days=1)
+    timePerDayDict[day] = timePerDayDict.get(day, timedelta(0)) + (endDatetime - cursor)
 
 
 def fillMissingDaysWithZeroTime(timePerDayDict, rebootDateObj):
@@ -302,55 +307,56 @@ def fillMissingDaysWithZeroTime(timePerDayDict, rebootDateObj):
         for i in range(1, (oldestZeroTimeDay - latestZeroTimeDay).days + 1):
             if len(timePerDayDict) == DAYS_TO_SHOW:
                 return
-            updateTimePerDayDict(
-                timePerDayDict, oldestZeroTimeDay - timedelta(days=i), timedelta(0)
-            )
+            timePerDayDict.setdefault(oldestZeroTimeDay - timedelta(days=i), timedelta(0))
 
 
-def handleRunningRebootLine(latestRunningRebootLine, timePerDayDict):
-    runningRebootDateStr = " ".join(latestRunningRebootLine[5:7])
-    runningRebootDateStr = runningRebootDateStr[:4] + runningRebootDateStr[4:].zfill(2)
-    runningRebootDateObj = datetime.strptime(
-        runningRebootDateStr + str(CURRENT_TIME.year), "%b %d%Y"
+def getBootDatetime(rebootLine):
+    # rebootLine is the split output of `last reboot`, e.g.
+    # ['reboot','system','boot','KERNEL','Sun','Aug','28','22:45','-','23:12','(00:27)']
+    rebootDateStr = " ".join(rebootLine[5:7])
+    rebootDateStr = rebootDateStr[:4] + rebootDateStr[4:].zfill(2)
+    rebootDateObj = datetime.strptime(
+        rebootDateStr + str(CURRENT_TIME.year), "%b %d%Y"
     ).date()
-    rebootTime = datetime.strptime(
-        f"{latestRunningRebootLine[-3]} {runningRebootDateStr} {CURRENT_TIME.year}",
-        "%H:%M %b %d %Y",
-    )
-    updateTimePerDayDict(
-        timePerDayDict, runningRebootDateObj, CURRENT_TIME - rebootTime
-    )
+    rebootTimeObj = datetime.strptime(rebootLine[7], "%H:%M").time()
+    return datetime.combine(rebootDateObj, rebootTimeObj)
 
 
 def parseRebootLogs():
     rebootOutput = os.popen("last reboot")
     rebootLine = rebootOutput.readline()[:-1]
     timePerDayDict = {}
-    latestRunningRebootLine = None
+    runningBoots = []  # boot datetimes of "still running" lines, newest first
 
     while rebootLine:
         rebootLine = rebootLine.split()
-        rebootDateStr = " ".join(rebootLine[5:7])
-        rebootDateStr = rebootDateStr[:4] + rebootDateStr[4:].zfill(2)
-        rebootDateObj = datetime.strptime(
-            rebootDateStr + str(CURRENT_TIME.year), "%b %d%Y"
-        ).date()
+
+        # `last reboot` ends with a `wtmp begins ...` summary row (and can print
+        # a bare newline). Skip anything that isn't an actual boot entry.
+        if len(rebootLine) < 3 or rebootLine[0] != "reboot":
+            break
+
+        bootTime = getBootDatetime(rebootLine)
+        rebootDateObj = bootTime.date()
 
         if rebootDateObj not in timePerDayDict and len(timePerDayDict) > DAYS_TO_SHOW:
             return timePerDayDict
 
         fillMissingDaysWithZeroTime(timePerDayDict, rebootDateObj)
 
-        if len(rebootLine) < 3:
-            break
         if rebootLine[-1] == "running":
-            latestRunningRebootLine = rebootLine
-            rebootLine = rebootOutput.readline()
+            if not runningBoots:
+                # first (newest) "still running" line: the live session, running
+                # up to now. Attribute it immediately so it is never dropped by
+                # the DAYS_TO_SHOW early-return below.
+                updateTimePerDayDict(timePerDayDict, bootTime, CURRENT_TIME)
+            else:
+                # an older "still running" line. It was never cleanly shut down,
+                # so it actually ended when the next-newer boot took the machine.
+                updateTimePerDayDict(timePerDayDict, bootTime, runningBoots[-1])
+            runningBoots.append(bootTime)
+            rebootLine = rebootOutput.readline()[:-1]
             continue
-
-        if latestRunningRebootLine:
-            handleRunningRebootLine(latestRunningRebootLine, timePerDayDict)
-            latestRunningRebootLine = None
 
         try:
             # (HH:MM)
@@ -375,7 +381,7 @@ def parseRebootLogs():
                 # weird durations like (-HH:MM)
                 rebootDuration = timedelta(0)
 
-        updateTimePerDayDict(timePerDayDict, rebootDateObj, rebootDuration)
+        updateTimePerDayDict(timePerDayDict, bootTime, bootTime + rebootDuration)
         rebootLine = rebootOutput.readline()[:-1]
 
     return timePerDayDict
